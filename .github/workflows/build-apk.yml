@@ -11,6 +11,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,18 +27,28 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Set up Android SDK tools
-        uses: android-actions/setup-android@v3
+      - name: Check Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          MANAGER="$SDK/cmdline-tools/latest/bin/sdkmanager"
 
-      - name: Install Android SDK 35
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+
+          if [ ! -f "$SDK/platforms/android-35/android.jar" ] || [ ! -x "$SDK/build-tools/35.0.0/aapt2" ]; then
+            test -x "$MANAGER"
+            yes | "$MANAGER" --sdk_root="$SDK" --licenses > /dev/null || true
+            "$MANAGER" --sdk_root="$SDK" "platforms;android-35" "build-tools;35.0.0"
+          fi
 
       - name: Unpack one-upload ZIP
         shell: bash
         run: |
           set -euo pipefail
           ZIP="GoogleTV-Remote-Hub-Watch8-V5-PairSafe-OneUpload.zip"
-          test -f "$ZIP" || { echo "::error::Upload $ZIP into the repository root"; exit 1; }
+          test -f "$ZIP"
           unzip -tq "$ZIP"
           mkdir -p "$RUNNER_TEMP/watch8"
           unzip -q "$ZIP" -d "$RUNNER_TEMP/watch8"
